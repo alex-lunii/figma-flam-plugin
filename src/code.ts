@@ -57,6 +57,11 @@ async function generateMockups() {
 
   const generated: FrameNode[] = [];
 
+  // Anchor point: right of the rightmost source frame, aligned to the topmost one
+  const startX = Math.max(...nodes.map(n => n.absoluteTransform[0][2] + n.width)) + 80;
+  const startY = Math.min(...nodes.map(n => n.absoluteTransform[1][2]));
+  const GAP = 40;
+
   try {
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
@@ -90,11 +95,9 @@ async function generateMockups() {
       screenRect.fills = [{ type: "IMAGE", imageHash: screenImage.hash, scaleMode: "FILL" }];
       mockupFrame.appendChild(screenRect);
 
-      // Place to the right of the source frame
-      const sourceX = node.absoluteTransform[0][2];
-      const sourceY = node.absoluteTransform[1][2];
-      mockupFrame.x = sourceX + node.width + 80;
-      mockupFrame.y = sourceY;
+      // Place side by side
+      mockupFrame.x = startX + i * (outW + GAP);
+      mockupFrame.y = startY;
 
       figma.currentPage.appendChild(mockupFrame);
       generated.push(mockupFrame);
