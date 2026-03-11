@@ -106,12 +106,21 @@
 
       if (msg.type === "loading") {
         status.className = "hint loading";
-        status.textContent = "Génération en cours…";
+        status.textContent = msg.total > 1
+          ? `Génération de ${msg.total} mockups…`
+          : "Génération en cours…";
+      }
+
+      if (msg.type === "progress") {
+        status.className = "hint loading";
+        status.textContent = `${msg.current} / ${msg.total} — ${msg.name}`;
       }
 
       if (msg.type === "success") {
         status.className = "hint success";
-        status.textContent = `✓ Mockup créé : "${msg.name}"`;
+        status.textContent = msg.count > 1
+          ? `✓ ${msg.count} mockups générés`
+          : `✓ Mockup généré`;
         btn.disabled = false;
       }
 
