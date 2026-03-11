@@ -20,11 +20,14 @@ const SCALE_Y = TARGET_SCREEN_H / SCREEN_H; // ≈ 1.098
 
 const VALID_TYPES = ["FRAME", "COMPONENT", "INSTANCE"];
 
-figma.showUI(__html__, { width: 300, height: 220, title: "FLAM Mockup" });
+figma.showUI(__html__, { width: 300, height: 280, title: "FLAM Mockup" });
 
 figma.ui.onmessage = async (msg: { type: string }) => {
   if (msg.type === "generate") {
     await generateMockups();
+  }
+  if (msg.type === "export") {
+    await exportMockups();
   }
   if (msg.type === "close") {
     figma.closePlugin();
@@ -107,6 +110,34 @@ async function generateMockups() {
     figma.viewport.scrollAndZoomIntoView(generated);
 
     figma.ui.postMessage({ type: "success", count: generated.length });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    figma.ui.postMessage({ type: "error", message });
+  }
+}
+
+async function exportMockups() {
+  const mockupFrames = figma.currentPage.children.filter(
+    (node) => node.type === "FRAME" && node.name.startsWith("FLAM — ")
+  ) as FrameNode[];
+
+  if (mockupFrames.length === 0) {
+    figma.ui.postMessage({ type: "error", message: "Aucun mockup FLAM trouvé sur cette page." });
+    return;
+  }
+
+  figma.ui.postMessage({ type: "exporting", total: mockupFrames.length });
+
+  try {
+    const files: { name: string; data: number[] }[] = [];
+
+    for (const frame of mockupFrames) {
+      const bytes = await frame.exportAsync({ format: "PNG", constraint: { type: "SCALE", value: 1 } });
+      const safeName = frame.name.replace(/[/\\:*?"<>|]/g, "-");
+      files.push({ name: `${safeName}.png`, data: Array.from(bytes) });
+    }
+
+    figma.ui.postMessage({ type: "export-data", files });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     figma.ui.postMessage({ type: "error", message });
