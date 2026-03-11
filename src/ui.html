@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -10,7 +11,7 @@
       background: #1a1a1a;
       color: #fff;
       padding: 20px;
-      height: 220px;
+      height: 280px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -60,10 +61,15 @@
       color: #FFD54F;
     }
 
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
     button {
       width: 100%;
       padding: 12px;
-      background: #E84B2A;
       color: #fff;
       border: none;
       border-radius: 8px;
@@ -75,6 +81,9 @@
 
     button:hover { opacity: 0.85; }
     button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #btn-generate { background: #E84B2A; }
+    #btn-export { background: #2a2a2a; border: 1px solid #444; }
   </style>
 </head>
 <body>
@@ -89,18 +98,34 @@
     Sélectionne une frame sur le canvas, puis clique sur Générer.
   </div>
 
-  <button id="btn" onclick="generate()">Générer le mockup</button>
+  <div class="actions">
+    <button id="btn-generate" onclick="generate()">Générer le mockup</button>
+    <button id="btn-export" onclick="exportZip()">Exporter tous les mockups (.zip)</button>
+  </div>
 
   <script>
-    const btn = document.getElementById("btn");
+    const btnGenerate = document.getElementById("btn-generate");
+    const btnExport = document.getElementById("btn-export");
     const status = document.getElementById("status");
 
+    function setLoading(isLoading) {
+      btnGenerate.disabled = isLoading;
+      btnExport.disabled = isLoading;
+    }
+
     function generate() {
-      btn.disabled = true;
+      setLoading(true);
       parent.postMessage({ pluginMessage: { type: "generate" } }, "*");
     }
 
-    window.onmessage = (event) => {
+    function exportZip() {
+      setLoading(true);
+      status.className = "hint loading";
+      status.textContent = "Recherche des mockups…";
+      parent.postMessage({ pluginMessage: { type: "export" } }, "*");
+    }
+
+    window.onmessage = async (event) => {
       const msg = event.data.pluginMessage;
       if (!msg) return;
 
@@ -109,16 +134,43 @@
         status.textContent = "Génération en cours…";
       }
 
+      if (msg.type === "exporting") {
+        status.className = "hint loading";
+        status.textContent = `Export de ${msg.total} mockup${msg.total > 1 ? "s" : ""} en cours…`;
+      }
+
       if (msg.type === "success") {
         status.className = "hint success";
         status.textContent = `✓ Mockup créé : "${msg.name}"`;
-        btn.disabled = false;
+        setLoading(false);
+      }
+
+      if (msg.type === "export-data") {
+        try {
+          const zip = new JSZip();
+          for (const file of msg.files) {
+            zip.file(file.name, new Uint8Array(file.data));
+          }
+          const blob = await zip.generateAsync({ type: "blob" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "flam-mockups.zip";
+          a.click();
+          URL.revokeObjectURL(url);
+          status.className = "hint success";
+          status.textContent = `✓ ${msg.files.length} mockup${msg.files.length > 1 ? "s" : ""} exporté${msg.files.length > 1 ? "s" : ""} dans flam-mockups.zip`;
+        } catch (err) {
+          status.className = "hint error";
+          status.textContent = `Erreur ZIP : ${err.message}`;
+        }
+        setLoading(false);
       }
 
       if (msg.type === "error") {
         status.className = "hint error";
         status.textContent = `Erreur : ${msg.message}`;
-        btn.disabled = false;
+        setLoading(false);
       }
     };
   </script>
